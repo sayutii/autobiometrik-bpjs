@@ -5,12 +5,20 @@ from typing import Optional
 from .config import Config
 
 AUTOIT_AVAILABLE = False
+AUTOIT_ERROR = ""
+
 try:
     if sys.platform == "win32":
         import autoit  # type: ignore
         AUTOIT_AVAILABLE = True
-except ImportError:
+except Exception as e:
     AUTOIT_AVAILABLE = False
+    AUTOIT_ERROR = str(e)
+    print(f"[WARN] PyAutoIt import exception: {e}")
+except BaseException as e:
+    AUTOIT_AVAILABLE = False
+    AUTOIT_ERROR = str(e)
+    print(f"[WARN] PyAutoIt base exception: {e}")
 
 # Window Titles & Identifiers for AutoIt
 FRISTA_TITLE = "FRISTA"

@@ -152,10 +152,9 @@ pyinstaller autobiometrik-bpjs.spec
 
 Hasil `.exe` akan berada di folder `dist/autobiometrik-bpjs.exe`. Cukup letakkan `config.json` di sebelahnya dan jalankan.
 
-### Cara B: Otomatis via GitHub Actions (Rekomendasi)
-Sudah disediakan workflow [`.github/workflows/ci-build.yml`](file://.github/workflows/ci-build.yml):
-1. **Otomatis Test (`pytest`)**: Berjalan setiap kali ada `git push` atau `pull request`.
-2. **Otomatis Build `.exe`**: Setiap kali Anda membuat tag versi baru (`git tag v1.0.1 && git push origin v1.0.1`) atau menekan **Run workflow** di tab Actions GitHub, GitHub akan otomatis membuat file `autobiometrik-bpjs.exe` di environment Windows resmi GitHub dan menyediakan link download artifact-nya!
+### 📄 File Logging (`autobiometrik.log`)
+Aplikasi secara otomatis mencatat seluruh log aktivitas server dan error traceback ke dalam file **`autobiometrik.log`** di folder tempat file `.exe` / program berada.
+- Jika terjadi error saat dijalankan di Windows, buka file **`autobiometrik.log`** untuk melihat pesan error secara lengkap.
 
 ---
 
