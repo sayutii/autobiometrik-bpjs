@@ -64,7 +64,9 @@ def start_frista_task(no_peserta: str, config: Config) -> None:
         return
 
     _configure_autoit()
-    frista_win = "[REGEXPTITLE:(?i).*(FRISTA).*]"
+    # Match window titles starting with FRISTA (e.g. FRISTA, FRISTA 3.0.1, Login FRISTA)
+    # ^FRISTA prevents matching folder paths like C:\...\frista.v.3.0.1 in CMD or Explorer
+    frista_win = "[REGEXPTITLE:(?i)^(FRISTA|Login FRISTA|Verifikasi Wajah)]"
 
     print(f"[INFO] Running start_frista_task for no_peserta: {no_peserta}")
     print(f"[INFO] FRISTA Config -> Path: '{config.frista_path}', User: '{config.frista_username}'")
@@ -81,10 +83,12 @@ def start_frista_task(no_peserta: str, config: Config) -> None:
             print(f"[ERROR] Gagal membuka file executable FRISTA ({config.frista_path}): {err}")
             return
 
+        time.sleep(2.5)  # Beri waktu proses GUI FRISTA inisialisasi awal
+
         # Tunggu hingga jendela FRISTA / Login muncul (maksimum 15 detik)
         wait_success = autoit.win_wait(frista_win, timeout=15)
         if not wait_success:
-            print(f"[WARN] Timeout 15 detik menunggu jendela FRISTA muncul!")
+            print(f"[WARN] Timeout 15 detik menunggu jendela FRISTA ({frista_win}) muncul!")
         
         try:
             autoit.win_activate(frista_win)
@@ -98,6 +102,8 @@ def start_frista_task(no_peserta: str, config: Config) -> None:
         if config.frista_username:
             print(f"[INFO] Mengisi kredensial FRISTA untuk user: '{config.frista_username}'")
             try:
+                autoit.win_activate(frista_win)
+                time.sleep(0.5)
                 autoit.send("^a{DEL}")  # Select all & delete
                 autoit.send(config.frista_username)
                 autoit.send("{TAB}")
@@ -136,8 +142,8 @@ def start_finger_task(no_peserta: str, config: Config) -> None:
         return
 
     _configure_autoit()
-    # Hanya mencocokkan "Sidik Jari" atau "After" (tanpa kata "Biometrik" yang bisa bentrok dengan nama folder/browser)
-    finger_win = "[REGEXPTITLE:(?i).*(Sidik Jari|After).*]"
+    # Matches titles starting with Aplikasi Sidik Jari, After, or Sidik Jari
+    finger_win = "[REGEXPTITLE:(?i)^(Aplikasi Sidik Jari|After|Sidik Jari)]"
 
     print(f"[INFO] Running start_finger_task for no_peserta: {no_peserta}")
     print(f"[INFO] Finger Config -> Path: '{config.finger_path}', User: '{config.finger_username}'")
@@ -154,9 +160,11 @@ def start_finger_task(no_peserta: str, config: Config) -> None:
             print(f"[ERROR] Gagal membuka file executable Sidik Jari ({config.finger_path}): {err}")
             return
 
+        time.sleep(2.5)  # Beri waktu proses GUI Sidik Jari inisialisasi awal
+
         wait_success = autoit.win_wait(finger_win, timeout=15)
         if not wait_success:
-            print(f"[WARN] Timeout 15 detik menunggu jendela Sidik Jari muncul!")
+            print(f"[WARN] Timeout 15 detik menunggu jendela Sidik Jari ({finger_win}) muncul!")
 
         try:
             autoit.win_activate(finger_win)
@@ -170,6 +178,8 @@ def start_finger_task(no_peserta: str, config: Config) -> None:
         if config.finger_username:
             print(f"[INFO] Mengisi kredensial Sidik Jari untuk user: '{config.finger_username}'")
             try:
+                autoit.win_activate(finger_win)
+                time.sleep(0.5)
                 autoit.send("^a{DEL}")
                 autoit.send(config.finger_username)
                 autoit.send("{TAB}")
@@ -203,7 +213,7 @@ def stop_frista() -> bool:
         return True
 
     _configure_autoit()
-    frista_win = "[REGEXPTITLE:(?i).*(FRISTA).*]"
+    frista_win = "[REGEXPTITLE:(?i)^(FRISTA|Login FRISTA|Verifikasi Wajah)]"
 
     try:
         if autoit.win_exists(frista_win):
@@ -223,7 +233,7 @@ def stop_finger() -> bool:
         return True
 
     _configure_autoit()
-    finger_win = "[REGEXPTITLE:(?i).*(Sidik Jari|After).*]"
+    finger_win = "[REGEXPTITLE:(?i)^(Aplikasi Sidik Jari|After|Sidik Jari)]"
 
     try:
         if autoit.win_exists(finger_win):
