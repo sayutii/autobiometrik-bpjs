@@ -70,9 +70,17 @@ def global_exception_handler(exc_type, exc_value, exc_traceback):
 
 sys.excepthook = global_exception_handler
 
-# Top-level imports after exception handler setup
-from .config import Config
-from .server import run_server
+# Safe import fallback for both package mode (python -m autobiometrik) and standalone PyInstaller script mode
+try:
+    from autobiometrik.config import Config
+    from autobiometrik.server import run_server
+except (ImportError, ValueError):
+    try:
+        from .config import Config
+        from .server import run_server
+    except (ImportError, ValueError):
+        from config import Config
+        from server import run_server
 
 
 def main() -> None:

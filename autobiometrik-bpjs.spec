@@ -15,7 +15,7 @@ except Exception:
     pass
 
 a = Analysis(
-    ['autobiometrik/__main__.py'],
+    ['run.py'],
     pathex=[],
     binaries=[],
     datas=autoit_datas,
