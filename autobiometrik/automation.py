@@ -1,7 +1,7 @@
 import sys
 import time
 import subprocess
-from typing import Optional
+from typing import Optional, List
 from .config import Config
 
 AUTOIT_AVAILABLE = False
@@ -20,9 +20,29 @@ except BaseException as e:
     AUTOIT_ERROR = str(e)
     print(f"[WARN] PyAutoIt base exception: {e}")
 
-# Process names for process_exists and process_close
+# Process names for Windows process detection
 FRISTA_PROCESS = "frista.exe"
 FINGER_PROCESS = "After.exe"
+
+# Window title patterns for FRISTA and Fingerprint app
+FRISTA_PATTERNS = [
+    "[CLASS:SunAwtFrame]",
+    "FRISTA",
+    "Login FRISTA",
+    "Verifikasi Wajah",
+    "[REGEXPTITLE:(?i)^FRISTA]",
+    "[REGEXPTITLE:(?i).*(FRISTA).*]",
+]
+
+FINGER_PATTERNS = [
+    "Aplikasi Sidik Jari BPJS Kesehatan",
+    "Aplikasi Sidik Jari",
+    "After",
+    "Form Login",
+    "BPJS Kesehatan",
+    "[REGEXPTITLE:(?i)^(Aplikasi Sidik Jari|After|Sidik Jari)]",
+    "[REGEXPTITLE:(?i).*(Sidik Jari|After).*]",
+]
 
 
 def is_autoit_available() -> bool:
@@ -47,16 +67,44 @@ def _configure_autoit() -> None:
     if not AUTOIT_AVAILABLE:
         return
     try:
-        autoit.opt("WinTitleMatchMode", 2)  # Match any substring in title
-        autoit.opt("SendKeyDelay", 30)       # 30ms delay between keystrokes for GUI stability
+        autoit.opt("WinTitleMatchMode", 2)  # Substring matching
+        autoit.opt("SendKeyDelay", 30)       # 30ms keystroke delay for GUI input stability
     except Exception as e:
         print(f"[WARN] Gagal mengatur opsi AutoIt: {e}")
+
+
+def _wait_and_activate(patterns: List[str], timeout: float = 12.0) -> Optional[str]:
+    """
+    Mencoba menemukan dan mengaktifkan salah satu pola jendela dari daftar.
+    Aman (tidak melempar AutoItError exception jika timeout).
+    """
+    if not AUTOIT_AVAILABLE:
+        return None
+
+    _configure_autoit()
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        for pattern in patterns:
+            try:
+                if autoit.win_exists(pattern):
+                    try:
+                        autoit.win_activate(pattern)
+                        autoit.win_wait_active(pattern, timeout=2)
+                    except Exception:
+                        pass
+                    return pattern
+            except Exception:
+                pass
+        time.sleep(0.5)
+
+    print(f"[WARN] Tidak dapat mengaktifkan jendela dari daftar pola: {patterns}")
+    return None
 
 
 def start_frista_task(no_peserta: str, config: Config) -> None:
     """
     Tugas otomatisasi background untuk aplikasi FRISTA.
-    - Jika belum jalan: buka, login otomatis dengan frista_username & frista_password.
+    - Jika belum jalan: buka, login otomatis (username & password), tekan Login.
     - Ketikkan no_peserta ke kolom 'No. BPJS Kesehatan/NIK'.
     """
     if not AUTOIT_AVAILABLE:
@@ -64,14 +112,10 @@ def start_frista_task(no_peserta: str, config: Config) -> None:
         return
 
     _configure_autoit()
-    # Match window titles starting with FRISTA (e.g. FRISTA, FRISTA 3.0.1, Login FRISTA)
-    # ^FRISTA prevents matching folder paths like C:\...\frista.v.3.0.1 in CMD or Explorer
-    frista_win = "[REGEXPTITLE:(?i)^(FRISTA|Login FRISTA|Verifikasi Wajah)]"
 
     print(f"[INFO] Running start_frista_task for no_peserta: {no_peserta}")
     print(f"[INFO] FRISTA Config -> Path: '{config.frista_path}', User: '{config.frista_username}'")
 
-    # Gunakan pengecekan nama proses executable frista.exe (bebas salah deteksi folder/browser)
     already_running = is_process_running(FRISTA_PROCESS)
     print(f"[INFO] FRISTA process ({FRISTA_PROCESS}) running: {already_running}")
 
@@ -83,45 +127,52 @@ def start_frista_task(no_peserta: str, config: Config) -> None:
             print(f"[ERROR] Gagal membuka file executable FRISTA ({config.frista_path}): {err}")
             return
 
-        time.sleep(2.5)  # Beri waktu proses GUI FRISTA inisialisasi awal
+        time.sleep(2.0)
+        active_pat = _wait_and_activate(FRISTA_PATTERNS, timeout=15.0)
+        print(f"[INFO] FRISTA active window pattern: {active_pat}")
+        time.sleep(1.5)
 
-        # Tunggu hingga jendela FRISTA / Login muncul (maksimum 15 detik)
-        wait_success = autoit.win_wait(frista_win, timeout=15)
-        if not wait_success:
-            print(f"[WARN] Timeout 15 detik menunggu jendela FRISTA ({frista_win}) muncul!")
-        
-        try:
-            autoit.win_activate(frista_win)
-            autoit.win_wait_active(frista_win, timeout=5)
-        except Exception as err:
-            print(f"[WARN] Gagal mengaktifkan jendela FRISTA: {err}")
-
-        time.sleep(1.5)  # Tunggu sebentar hingga komponen GUI selesai dirender
-
-        # Jika username FRISTA diisi di config.json, lakukan login otomatis
+        # Proses Login Otomatis FRISTA
         if config.frista_username:
             print(f"[INFO] Mengisi kredensial FRISTA untuk user: '{config.frista_username}'")
             try:
-                autoit.win_activate(frista_win)
+                if active_pat:
+                    autoit.win_activate(active_pat)
                 time.sleep(0.5)
-                autoit.send("^a{DEL}")  # Select all & delete
+
+                # Isi Username
+                autoit.send("^a{DEL}")
                 autoit.send(config.frista_username)
+                time.sleep(0.3)
+
+                # Isi Password
                 autoit.send("{TAB}")
                 time.sleep(0.3)
                 autoit.send("^a{DEL}")
                 autoit.send(config.frista_password)
+                time.sleep(0.3)
+
+                # Submit Form Login dengan ENTER
                 autoit.send("{ENTER}")
-                print("[INFO] Form login FRISTA telah disubmit ({ENTER})")
-                time.sleep(3.0)  # Tunggu proses login selesai dan masuk ke layar utama
+                print("[INFO] Form login FRISTA disubmit dengan {ENTER}")
+                time.sleep(0.5)
+
+                # Fallback: tekan TAB lalu ENTER untuk memastikan tombol Login tertekan
+                autoit.send("{TAB}")
+                autoit.send("{ENTER}")
+                print("[INFO] Fallback tombol Login FRISTA dikirim ({TAB} + {ENTER})")
+
+                time.sleep(3.5)  # Tunggu login sukses dan masuk ke layar utama FRISTA
             except Exception as err:
-                print(f"[ERROR] Gagal mengisi kredensial FRISTA: {err}")
+                print(f"[ERROR] Gagal melakukan login FRISTA: {err}")
         else:
             print("[INFO] frista_username kosong di config.json, melewati langkah login.")
 
-    # Setelah di layar utama / aktif, ketikkan nomor BPJS
+    # Ketikkan no_peserta
     try:
-        autoit.win_activate(frista_win)
-        autoit.win_wait_active(frista_win, timeout=5)
+        active_pat = _wait_and_activate(FRISTA_PATTERNS, timeout=5.0)
+        if active_pat:
+            autoit.win_activate(active_pat)
         time.sleep(0.5)
 
         autoit.send("^a{DEL}")
@@ -134,7 +185,7 @@ def start_frista_task(no_peserta: str, config: Config) -> None:
 def start_finger_task(no_peserta: str, config: Config) -> None:
     """
     Tugas otomatisasi background untuk aplikasi Sidik Jari (After.exe).
-    - Jika belum jalan: buka, login otomatis (jika finger_username tersedia).
+    - Jika belum jalan: buka, login otomatis (username & password), tekan Login.
     - Ketikkan no_peserta ke kolom input nomor BPJS.
     """
     if not AUTOIT_AVAILABLE:
@@ -142,13 +193,10 @@ def start_finger_task(no_peserta: str, config: Config) -> None:
         return
 
     _configure_autoit()
-    # Matches titles starting with Aplikasi Sidik Jari, After, or Sidik Jari
-    finger_win = "[REGEXPTITLE:(?i)^(Aplikasi Sidik Jari|After|Sidik Jari)]"
 
     print(f"[INFO] Running start_finger_task for no_peserta: {no_peserta}")
     print(f"[INFO] Finger Config -> Path: '{config.finger_path}', User: '{config.finger_username}'")
 
-    # Gunakan pengecekan nama proses executable After.exe
     already_running = is_process_running(FINGER_PROCESS)
     print(f"[INFO] Finger process ({FINGER_PROCESS}) running: {already_running}")
 
@@ -160,43 +208,52 @@ def start_finger_task(no_peserta: str, config: Config) -> None:
             print(f"[ERROR] Gagal membuka file executable Sidik Jari ({config.finger_path}): {err}")
             return
 
-        time.sleep(2.5)  # Beri waktu proses GUI Sidik Jari inisialisasi awal
-
-        wait_success = autoit.win_wait(finger_win, timeout=15)
-        if not wait_success:
-            print(f"[WARN] Timeout 15 detik menunggu jendela Sidik Jari ({finger_win}) muncul!")
-
-        try:
-            autoit.win_activate(finger_win)
-            autoit.win_wait_active(finger_win, timeout=5)
-        except Exception as err:
-            print(f"[WARN] Gagal mengaktifkan jendela Sidik Jari: {err}")
-
+        time.sleep(2.0)
+        active_pat = _wait_and_activate(FINGER_PATTERNS, timeout=15.0)
+        print(f"[INFO] Finger active window pattern: {active_pat}")
         time.sleep(1.5)
 
-        # Login jika finger_username diisi di config.json
+        # Proses Login Otomatis Sidik Jari (After.exe)
         if config.finger_username:
             print(f"[INFO] Mengisi kredensial Sidik Jari untuk user: '{config.finger_username}'")
             try:
-                autoit.win_activate(finger_win)
+                if active_pat:
+                    autoit.win_activate(active_pat)
                 time.sleep(0.5)
+
+                # Isi Username
                 autoit.send("^a{DEL}")
                 autoit.send(config.finger_username)
+                time.sleep(0.3)
+
+                # Isi Password
                 autoit.send("{TAB}")
                 time.sleep(0.3)
                 autoit.send("^a{DEL}")
                 autoit.send(config.finger_password)
+                time.sleep(0.3)
+
+                # Submit Form Login dengan ENTER
                 autoit.send("{ENTER}")
-                print("[INFO] Form login Sidik Jari telah disubmit ({ENTER})")
-                time.sleep(3.0)
+                print("[INFO] Form login Sidik Jari disubmit dengan {ENTER}")
+                time.sleep(0.5)
+
+                # Fallback: tekan TAB lalu ENTER untuk memastikan tombol Login tertekan
+                autoit.send("{TAB}")
+                autoit.send("{ENTER}")
+                print("[INFO] Fallback tombol Login Sidik Jari dikirim ({TAB} + {ENTER})")
+
+                time.sleep(3.5)  # Tunggu login sukses dan masuk ke layar utama Sidik Jari
             except Exception as err:
-                print(f"[ERROR] Gagal mengisi kredensial Sidik Jari: {err}")
+                print(f"[ERROR] Gagal melakukan login Sidik Jari: {err}")
         else:
             print("[INFO] finger_username kosong di config.json, melewati langkah login.")
 
+    # Ketikkan no_peserta
     try:
-        autoit.win_activate(finger_win)
-        autoit.win_wait_active(finger_win, timeout=5)
+        active_pat = _wait_and_activate(FINGER_PATTERNS, timeout=5.0)
+        if active_pat:
+            autoit.win_activate(active_pat)
         time.sleep(0.5)
 
         autoit.send("^a{DEL}")
@@ -213,11 +270,10 @@ def stop_frista() -> bool:
         return True
 
     _configure_autoit()
-    frista_win = "[REGEXPTITLE:(?i)^(FRISTA|Login FRISTA|Verifikasi Wajah)]"
-
     try:
-        if autoit.win_exists(frista_win):
-            autoit.win_close(frista_win)
+        active_pat = _wait_and_activate(FRISTA_PATTERNS, timeout=2.0)
+        if active_pat:
+            autoit.win_close(active_pat)
         autoit.process_close(FRISTA_PROCESS)
         print("[INFO] FRISTA berhasil dihentikan.")
         return True
@@ -233,11 +289,10 @@ def stop_finger() -> bool:
         return True
 
     _configure_autoit()
-    finger_win = "[REGEXPTITLE:(?i)^(Aplikasi Sidik Jari|After|Sidik Jari)]"
-
     try:
-        if autoit.win_exists(finger_win):
-            autoit.win_close(finger_win)
+        active_pat = _wait_and_activate(FINGER_PATTERNS, timeout=2.0)
+        if active_pat:
+            autoit.win_close(active_pat)
         autoit.process_close(FINGER_PROCESS)
         print("[INFO] Aplikasi Sidik Jari berhasil dihentikan.")
         return True
