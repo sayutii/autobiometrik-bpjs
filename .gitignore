@@ -1,0 +1,20 @@
+# Configuration with credentials
+config.json
+*.conf
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Environment / IDE
+.env
+.venv/
+env/
+venv/
+.vscode/
+.idea/
