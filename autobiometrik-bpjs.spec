@@ -1,13 +1,25 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+
 block_cipher = None
+
+# Collect autoit data files (including AutoItX3.dll / AutoItX3_x64.dll)
+autoit_datas = []
+autoit_hiddenimports = []
+
+try:
+    autoit_datas = collect_data_files('autoit')
+    autoit_hiddenimports = collect_submodules('autoit')
+except Exception:
+    pass
 
 a = Analysis(
     ['autobiometrik/__main__.py'],
     pathex=[],
     binaries=[],
-    datas=[],
-    hiddenimports=['flask', 'flask_cors', 'autoit'],
+    datas=autoit_datas,
+    hiddenimports=['flask', 'flask_cors', 'autoit'] + autoit_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
