@@ -73,6 +73,30 @@ def _configure_autoit() -> None:
         print(f"[WARN] Gagal mengatur opsi AutoIt: {e}")
 
 
+def _send_keys(text: str, is_raw: bool = True) -> None:
+    """
+    Mengirimkan teks atau tombol ke jendela aktif menggunakan AutoIt.
+    - is_raw=True: Mengirim teks mentah (raw), aman untuk password bersimbol seperti #, !, ^, +.
+    - is_raw=False: Mengirim tombol kontrol seperti {TAB}, {ENTER}, ^a{DEL}.
+    """
+    if not AUTOIT_AVAILABLE:
+        return
+    raw_flag = 1 if is_raw else 0
+    try:
+        autoit.send(text, raw_flag)
+    except TypeError:
+        # Fallback jika autoit.send tidak mendukung argumen posisi kedua di versi tertentu
+        try:
+            if is_raw:
+                autoit.send(f"{{RAW}}{text}")
+            else:
+                autoit.send(text)
+        except Exception as e:
+            print(f"[WARN] Error sending keys ({text}): {e}")
+    except Exception as e:
+        print(f"[WARN] Error sending keys ({text}): {e}")
+
+
 def _wait_and_activate(patterns: List[str], timeout: float = 12.0) -> Optional[str]:
     """
     Mencoba menemukan dan mengaktifkan salah satu pola jendela dari daftar.
@@ -102,7 +126,7 @@ def _wait_and_activate(patterns: List[str], timeout: float = 12.0) -> Optional[s
 
 
 def _is_login_screen_active() -> bool:
-    """Mengecek apakah jendela yang aktif saat ini merupakan layar Login/Masuk."""
+    """Mengecek apakah jendela yang sedang aktif merupakan layar Login/Masuk."""
     if not AUTOIT_AVAILABLE:
         return False
     try:
@@ -161,28 +185,28 @@ def start_frista_task(no_peserta: str, config: Config) -> None:
                 autoit.win_activate(active_pat)
             time.sleep(0.5)
 
-            # Isi Username (raw=1 agar teks terkirim utuh tanpa diubah key modifiers)
-            autoit.send("^a{DEL}", raw=0)
-            autoit.send(config.frista_username, raw=1)
+            # Isi Username (is_raw=True)
+            _send_keys("^a{DEL}", is_raw=False)
+            _send_keys(config.frista_username, is_raw=True)
             time.sleep(0.3)
 
             # Pindah ke kolom Password
-            autoit.send("{TAB}", raw=0)
+            _send_keys("{TAB}", is_raw=False)
             time.sleep(0.3)
 
-            # Isi Password (raw=1 agar karakter seperti #, !, ^, + tidak dianggap tombol Windows/Ctrl/Shift)
-            autoit.send("^a{DEL}", raw=0)
-            autoit.send(config.frista_password, raw=1)
+            # Isi Password (is_raw=True aman untuk simbol #, !, ^, +)
+            _send_keys("^a{DEL}", is_raw=False)
+            _send_keys(config.frista_password, is_raw=True)
             time.sleep(0.3)
 
             # Submit Form Login dengan ENTER
-            autoit.send("{ENTER}", raw=0)
+            _send_keys("{ENTER}", is_raw=False)
             print("[INFO] Form login FRISTA disubmit dengan {ENTER}")
             time.sleep(0.5)
 
             # Fallback: tekan TAB lalu ENTER untuk memastikan tombol Login tertekan
-            autoit.send("{TAB}", raw=0)
-            autoit.send("{ENTER}", raw=0)
+            _send_keys("{TAB}", is_raw=False)
+            _send_keys("{ENTER}", is_raw=False)
             print("[INFO] Fallback tombol Login FRISTA dikirim ({TAB} + {ENTER})")
 
             time.sleep(3.5)  # Tunggu login sukses dan masuk ke layar utama FRISTA
@@ -198,8 +222,8 @@ def start_frista_task(no_peserta: str, config: Config) -> None:
             autoit.win_activate(active_pat)
         time.sleep(0.5)
 
-        autoit.send("^a{DEL}", raw=0)
-        autoit.send(no_peserta, raw=1)
+        _send_keys("^a{DEL}", is_raw=False)
+        _send_keys(no_peserta, is_raw=True)
         print(f"[SUCCESS] FRISTA berhasil dikirim no_peserta: {no_peserta}")
     except Exception as e:
         print(f"[ERROR] Input no_peserta ke FRISTA gagal: {e}")
@@ -252,28 +276,28 @@ def start_finger_task(no_peserta: str, config: Config) -> None:
                 autoit.win_activate(active_pat)
             time.sleep(0.5)
 
-            # Isi Username (raw=1 agar teks terkirim utuh)
-            autoit.send("^a{DEL}", raw=0)
-            autoit.send(config.finger_username, raw=1)
+            # Isi Username
+            _send_keys("^a{DEL}", is_raw=False)
+            _send_keys(config.finger_username, is_raw=True)
             time.sleep(0.3)
 
             # Pindah ke kolom Password
-            autoit.send("{TAB}", raw=0)
+            _send_keys("{TAB}", is_raw=False)
             time.sleep(0.3)
 
-            # Isi Password (raw=1 agar karakter seperti #, !, ^, + tidak dianggap tombol Windows/Ctrl/Shift)
-            autoit.send("^a{DEL}", raw=0)
-            autoit.send(config.finger_password, raw=1)
+            # Isi Password (is_raw=True aman untuk simbol #, !, ^, +)
+            _send_keys("^a{DEL}", is_raw=False)
+            _send_keys(config.finger_password, is_raw=True)
             time.sleep(0.3)
 
             # Submit Form Login dengan ENTER
-            autoit.send("{ENTER}", raw=0)
+            _send_keys("{ENTER}", is_raw=False)
             print("[INFO] Form login Sidik Jari disubmit dengan {ENTER}")
             time.sleep(0.5)
 
             # Fallback: tekan TAB lalu ENTER untuk memastikan tombol Login tertekan
-            autoit.send("{TAB}", raw=0)
-            autoit.send("{ENTER}", raw=0)
+            _send_keys("{TAB}", is_raw=False)
+            _send_keys("{ENTER}", is_raw=False)
             print("[INFO] Fallback tombol Login Sidik Jari dikirim ({TAB} + {ENTER})")
 
             time.sleep(3.5)  # Tunggu login sukses dan masuk ke layar utama Sidik Jari
@@ -289,8 +313,8 @@ def start_finger_task(no_peserta: str, config: Config) -> None:
             autoit.win_activate(active_pat)
         time.sleep(0.5)
 
-        autoit.send("^a{DEL}", raw=0)
-        autoit.send(no_peserta, raw=1)
+        _send_keys("^a{DEL}", is_raw=False)
+        _send_keys(no_peserta, is_raw=True)
         print(f"[SUCCESS] Aplikasi Sidik Jari berhasil dikirim no_peserta: {no_peserta}")
     except Exception as e:
         print(f"[ERROR] Input no_peserta ke Aplikasi Sidik Jari gagal: {e}")
