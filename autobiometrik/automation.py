@@ -20,7 +20,7 @@ except BaseException as e:
     AUTOIT_ERROR = str(e)
     print(f"[WARN] PyAutoIt base exception: {e}")
 
-# Process names for process_close fallback
+# Process names for process_exists and process_close
 FRISTA_PROCESS = "frista.exe"
 FINGER_PROCESS = "After.exe"
 
@@ -28,6 +28,18 @@ FINGER_PROCESS = "After.exe"
 def is_autoit_available() -> bool:
     """Mengembalikan status ketersediaan AutoItX di sistem."""
     return AUTOIT_AVAILABLE
+
+
+def is_process_running(process_name: str) -> bool:
+    """Mengecek apakah proses Windows sedang berjalan berdasarkan nama file .exe."""
+    if not AUTOIT_AVAILABLE:
+        return False
+    try:
+        res = autoit.process_exists(process_name)
+        return bool(res and int(res) > 0)
+    except Exception as e:
+        print(f"[WARN] Error checking process {process_name}: {e}")
+        return False
 
 
 def _configure_autoit() -> None:
@@ -57,13 +69,9 @@ def start_frista_task(no_peserta: str, config: Config) -> None:
     print(f"[INFO] Running start_frista_task for no_peserta: {no_peserta}")
     print(f"[INFO] FRISTA Config -> Path: '{config.frista_path}', User: '{config.frista_username}'")
 
-    already_running = False
-    try:
-        already_running = bool(autoit.win_exists(frista_win))
-    except Exception as err:
-        print(f"[WARN] Error checking FRISTA window existence: {err}")
-
-    print(f"[INFO] FRISTA window exists / already running: {already_running}")
+    # Gunakan pengecekan nama proses executable frista.exe (bebas salah deteksi folder/browser)
+    already_running = is_process_running(FRISTA_PROCESS)
+    print(f"[INFO] FRISTA process ({FRISTA_PROCESS}) running: {already_running}")
 
     if not already_running:
         print(f"[INFO] Launching FRISTA process: {config.frista_path}")
@@ -128,18 +136,15 @@ def start_finger_task(no_peserta: str, config: Config) -> None:
         return
 
     _configure_autoit()
-    finger_win = "[REGEXPTITLE:(?i).*(Sidik Jari|After|Biometrik).*]"
+    # Hanya mencocokkan "Sidik Jari" atau "After" (tanpa kata "Biometrik" yang bisa bentrok dengan nama folder/browser)
+    finger_win = "[REGEXPTITLE:(?i).*(Sidik Jari|After).*]"
 
     print(f"[INFO] Running start_finger_task for no_peserta: {no_peserta}")
     print(f"[INFO] Finger Config -> Path: '{config.finger_path}', User: '{config.finger_username}'")
 
-    already_running = False
-    try:
-        already_running = bool(autoit.win_exists(finger_win))
-    except Exception as err:
-        print(f"[WARN] Error checking Finger window existence: {err}")
-
-    print(f"[INFO] Finger app window exists / already running: {already_running}")
+    # Gunakan pengecekan nama proses executable After.exe
+    already_running = is_process_running(FINGER_PROCESS)
+    print(f"[INFO] Finger process ({FINGER_PROCESS}) running: {already_running}")
 
     if not already_running:
         print(f"[INFO] Launching Finger process: {config.finger_path}")
@@ -212,13 +217,13 @@ def stop_frista() -> bool:
 
 
 def stop_finger() -> bool:
-    """Menutup aplikasi Sidik Jari (After.exe) jika sedang berjalan."""
+    """Menutup aplikasi Sidik Jari (After.exe) melepaskan proses After.exe."""
     if not AUTOIT_AVAILABLE:
         print("[MOCK] Aplikasi Sidik Jari stopped")
         return True
 
     _configure_autoit()
-    finger_win = "[REGEXPTITLE:(?i).*(Sidik Jari|After|Biometrik).*]"
+    finger_win = "[REGEXPTITLE:(?i).*(Sidik Jari|After).*]"
 
     try:
         if autoit.win_exists(finger_win):

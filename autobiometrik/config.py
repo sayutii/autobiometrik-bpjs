@@ -19,6 +19,13 @@ DEFAULT_CONFIG: Dict[str, Any] = {
 }
 
 
+def get_app_dir() -> str:
+    """Mengembalikan direktori tempat file .exe atau script berjalan."""
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
 class Config:
     """
     Kelas penanganan konfigurasi AutoBiometrik BPJS.
@@ -44,17 +51,25 @@ class Config:
         """
         Memuat konfigurasi dari file JSON atau INI (.conf).
         Jika config_path tidak ditentukan, akan memeriksa env AUTOBIOMETRIK_CONFIG,
-        kemudian config.json, lalu fallback ke config.conf.
+        kemudian config.json di CWD & folder aplikasi, lalu fallback ke config.conf.
         """
         data = dict(DEFAULT_CONFIG)
 
         target_path = config_path or os.getenv("AUTOBIOMETRIK_CONFIG")
 
         if not target_path:
+            app_dir = get_app_dir()
+            app_json = os.path.join(app_dir, "config.json")
+            app_conf = os.path.join(app_dir, "config.conf")
+
             if os.path.exists("config.json"):
                 target_path = "config.json"
+            elif os.path.exists(app_json):
+                target_path = app_json
             elif os.path.exists("config.conf"):
                 target_path = "config.conf"
+            elif os.path.exists(app_conf):
+                target_path = app_conf
 
         if target_path and os.path.exists(target_path):
             if target_path.endswith(".json"):
