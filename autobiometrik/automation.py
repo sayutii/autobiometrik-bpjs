@@ -189,9 +189,12 @@ def start_frista_task(no_peserta: str, config: Config) -> None:
             _send_keys(config.frista_password, is_raw=True)
             time.sleep(0.3)
 
-            # 4. Submit Form Login dengan ENTER bersih
+            # 4. Pindah ke tombol Login hijau FRISTA & Submit (TAB -> ENTER + SPACE)
+            _send_keys("{TAB}", is_raw=False)
+            time.sleep(0.3)
             _send_keys("{ENTER}", is_raw=False)
-            print("[INFO] Form login FRISTA disubmit dengan {ENTER}")
+            _send_keys("{SPACE}", is_raw=False)
+            print("[INFO] Tombol Login FRISTA disubmit (Tab -> Enter -> Space)")
 
             time.sleep(4.0)  # Tunggu otentikasi login selesai
         except Exception as err:
