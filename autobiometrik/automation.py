@@ -24,16 +24,13 @@ except BaseException as e:
 FRISTA_PROCESS = "frista.exe"
 FINGER_PROCESS = "After.exe"
 
-# Window title & class patterns for FRISTA (Login & Main)
+# Exact Window Titles for FRISTA (from screenshot: Login Frista (Face Recognition BPJS Kesehatan))
 FRISTA_LOGIN_TITLES = [
     "Login Frista (Face Recognition BPJS Kesehatan)",
     "Login Frista",
     "Login FRISTA",
-    "FRISTA",
-    "Verifikasi Wajah",
-    "[CLASS:SunAwtFrame]",
-    "[REGEXPTITLE:(?i)^(Login Frista|FRISTA)]",
-    "[ACTIVE]",
+    "[TITLE:Login Frista (Face Recognition BPJS Kesehatan)]",
+    "[REGEXPTITLE:(?i)^Login Frista]",
 ]
 
 FRISTA_MAIN_TITLES = [
@@ -41,29 +38,24 @@ FRISTA_MAIN_TITLES = [
     "FRISTA",
     "[CLASS:SunAwtFrame]",
     "[REGEXPTITLE:(?i)^FRISTA]",
-    "[ACTIVE]",
 ]
 
-# Window title & class patterns for Fingerprint app (After.exe)
+# Exact Window Titles for Fingerprint app (from screenshot: Aplikasi Registrasi Sidik Jari)
 FINGER_LOGIN_TITLES = [
+    "Aplikasi Registrasi Sidik Jari",
+    "Aplikasi Verifikasi dan Registrasi Sidik Jari",
     "Aplikasi Sidik Jari BPJS Kesehatan",
-    "Aplikasi Sidik Jari",
     "Form Login",
-    "Login Aplikasi Sidik Jari",
-    "Login",
-    "After",
-    "BPJS Kesehatan",
-    "[CLASS:TForm1]",
-    "[REGEXPTITLE:(?i).*(Sidik|Finger|After|BPJS|Login).*]",
-    "[ACTIVE]",
+    "[TITLE:Aplikasi Registrasi Sidik Jari]",
+    "[REGEXPTITLE:(?i)^Aplikasi (Registrasi|Verifikasi|Sidik)]",
 ]
 
 FINGER_MAIN_TITLES = [
-    "Aplikasi Sidik Jari BPJS Kesehatan",
+    "Aplikasi Registrasi Sidik Jari",
+    "Aplikasi Verifikasi dan Registrasi Sidik Jari",
     "Aplikasi Sidik Jari",
     "After",
-    "[REGEXPTITLE:(?i).*(Sidik|Finger|After).*]",
-    "[ACTIVE]",
+    "[REGEXPTITLE:(?i)^Aplikasi (Registrasi|Verifikasi|Sidik)]",
 ]
 
 
@@ -131,13 +123,7 @@ def _wait_and_activate(patterns: List[str], timeout: float = 10.0) -> Optional[s
     while time.time() - start_time < timeout:
         for pattern in patterns:
             try:
-                if pattern == "[ACTIVE]":
-                    try:
-                        autoit.win_activate("[ACTIVE]")
-                        return "[ACTIVE]"
-                    except Exception:
-                        pass
-                elif autoit.win_exists(pattern):
+                if autoit.win_exists(pattern):
                     try:
                         autoit.win_activate(pattern)
                         autoit.win_wait_active(pattern, timeout=2)
@@ -154,7 +140,7 @@ def _wait_and_activate(patterns: List[str], timeout: float = 10.0) -> Optional[s
 def start_frista_task(no_peserta: str, config: Config) -> None:
     """
     Tugas otomatisasi background untuk aplikasi FRISTA.
-    - Jika belum jalan / di layar login: buka, login otomatis, dan tekan tombol Login.
+    - Jika belum jalan / di layar login: buka & login otomatis.
     - Ketikkan no_peserta ke kolom 'No. BPJS Kesehatan/NIK'.
     """
     if not AUTOIT_AVAILABLE:
@@ -186,35 +172,33 @@ def start_frista_task(no_peserta: str, config: Config) -> None:
         print(f"[INFO] Mengisi kredensial FRISTA di '{login_win}' untuk user: '{config.frista_username}'")
         try:
             autoit.win_activate(login_win)
-            time.sleep(0.6)
+            autoit.win_wait_active(login_win, timeout=5)
+            time.sleep(0.8)
 
-            # 1. Clear & Isi Username
+            # 1. Tab & Clear untuk memastikan fokus di kolom Username
+            _send_keys("{TAB}", is_raw=False)
+            time.sleep(0.2)
             _send_keys("^a{DEL}", is_raw=False)
             _send_keys(config.frista_username, is_raw=True)
-            time.sleep(0.3)
+            time.sleep(0.4)
 
             # 2. Pindah ke kolom Password
             _send_keys("{TAB}", is_raw=False)
-            time.sleep(0.3)
-
-            # 3. Clear & Isi Password
-            _send_keys("^a{DEL}", is_raw=False)
-            _send_keys(config.frista_password, is_raw=True)
-            time.sleep(0.3)
-
-            # 4. Submit Form Login dengan ENTER
-            _send_keys("{ENTER}", is_raw=False)
-            print("[INFO] Form login FRISTA disubmit dengan {ENTER}")
             time.sleep(0.4)
 
-            # 5. Fallback: Tekan TAB lalu ENTER & SPACE untuk memastikan tombol Login tertekan
+            # 3. Clear & Isi Password (RAW mode untuk simbol #)
+            _send_keys("^a{DEL}", is_raw=False)
+            _send_keys(config.frista_password, is_raw=True)
+            time.sleep(0.4)
+
+            # 4. Pindah ke tombol Login & Submit (TAB -> ENTER + SPACE)
             _send_keys("{TAB}", is_raw=False)
-            time.sleep(0.2)
+            time.sleep(0.3)
             _send_keys("{ENTER}", is_raw=False)
             _send_keys("{SPACE}", is_raw=False)
-            print("[INFO] Tombol Login FRISTA ditekan ({TAB} + {ENTER} + {SPACE})")
+            print("[INFO] Form & Tombol Login FRISTA disubmit (Tab -> Enter -> Space)")
 
-            time.sleep(3.5)  # Tunggu otentikasi login selesai
+            time.sleep(4.0)  # Tunggu otentikasi login selesai
         except Exception as err:
             print(f"[ERROR] Gagal melakukan login FRISTA: {err}")
     elif not config.frista_username:
@@ -227,6 +211,7 @@ def start_frista_task(no_peserta: str, config: Config) -> None:
     if main_win:
         try:
             autoit.win_activate(main_win)
+            autoit.win_wait_active(main_win, timeout=5)
             time.sleep(0.5)
 
             _send_keys("^a{DEL}", is_raw=False)
@@ -263,7 +248,7 @@ def start_finger_task(no_peserta: str, config: Config) -> None:
             return
         time.sleep(2.5)
 
-    # Cari dan aktifkan jendela Login Sidik Jari (After.exe)
+    # Cari dan aktifkan jendela Login Sidik Jari (Aplikasi Registrasi Sidik Jari)
     login_win = _wait_and_activate(FINGER_LOGIN_TITLES, timeout=12.0)
     print(f"[INFO] Finger login window detected: '{login_win}'")
 
@@ -271,35 +256,33 @@ def start_finger_task(no_peserta: str, config: Config) -> None:
         print(f"[INFO] Mengisi kredensial Sidik Jari di '{login_win}' untuk user: '{config.finger_username}'")
         try:
             autoit.win_activate(login_win)
-            time.sleep(0.6)
+            autoit.win_wait_active(login_win, timeout=5)
+            time.sleep(0.8)
 
-            # 1. Clear & Isi Username
+            # 1. Tab & Clear untuk memastikan fokus di kolom Username
+            _send_keys("{TAB}", is_raw=False)
+            time.sleep(0.2)
             _send_keys("^a{DEL}", is_raw=False)
             _send_keys(config.finger_username, is_raw=True)
-            time.sleep(0.3)
+            time.sleep(0.4)
 
             # 2. Pindah ke kolom Password
             _send_keys("{TAB}", is_raw=False)
-            time.sleep(0.3)
-
-            # 3. Clear & Isi Password
-            _send_keys("^a{DEL}", is_raw=False)
-            _send_keys(config.finger_password, is_raw=True)
-            time.sleep(0.3)
-
-            # 4. Submit Form Login dengan ENTER
-            _send_keys("{ENTER}", is_raw=False)
-            print("[INFO] Form login Sidik Jari disubmit dengan {ENTER}")
             time.sleep(0.4)
 
-            # 5. Fallback: Tekan TAB lalu ENTER & SPACE untuk memastikan tombol Login tertekan
+            # 3. Clear & Isi Password (RAW mode untuk simbol #)
+            _send_keys("^a{DEL}", is_raw=False)
+            _send_keys(config.finger_password, is_raw=True)
+            time.sleep(0.4)
+
+            # 4. Pindah ke tombol Login ungu & Submit (TAB -> ENTER + SPACE)
             _send_keys("{TAB}", is_raw=False)
-            time.sleep(0.2)
+            time.sleep(0.3)
             _send_keys("{ENTER}", is_raw=False)
             _send_keys("{SPACE}", is_raw=False)
-            print("[INFO] Tombol Login Sidik Jari ditekan ({TAB} + {ENTER} + {SPACE})")
+            print("[INFO] Tombol Login Sidik Jari disubmit (Tab -> Enter -> Space)")
 
-            time.sleep(3.5)  # Tunggu otentikasi login selesai
+            time.sleep(4.0)  # Tunggu otentikasi login selesai
         except Exception as err:
             print(f"[ERROR] Gagal melakukan login Sidik Jari: {err}")
     elif not config.finger_username:
@@ -330,7 +313,7 @@ def stop_frista() -> bool:
     _configure_autoit()
     try:
         active_pat = _wait_and_activate(FRISTA_LOGIN_TITLES + FRISTA_MAIN_TITLES, timeout=2.0)
-        if active_pat and active_pat != "[ACTIVE]":
+        if active_pat:
             autoit.win_close(active_pat)
         autoit.process_close(FRISTA_PROCESS)
         print("[INFO] FRISTA berhasil dihentikan.")
@@ -349,7 +332,7 @@ def stop_finger() -> bool:
     _configure_autoit()
     try:
         active_pat = _wait_and_activate(FINGER_LOGIN_TITLES + FINGER_MAIN_TITLES, timeout=2.0)
-        if active_pat and active_pat != "[ACTIVE]":
+        if active_pat:
             autoit.win_close(active_pat)
         autoit.process_close(FINGER_PROCESS)
         print("[INFO] Aplikasi Sidik Jari berhasil dihentikan.")
