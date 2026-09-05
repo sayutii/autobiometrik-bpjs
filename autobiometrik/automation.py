@@ -175,7 +175,7 @@ def start_frista_task(no_peserta: str, config: Config) -> None:
             autoit.win_wait_active(login_win, timeout=5)
             time.sleep(0.6)
 
-            # 1. Langsung isi Username (kursor otomatis fokus di Username saat jendela aktif)
+            # 1. Langsung isi Username
             _send_keys("^a{DEL}", is_raw=False)
             _send_keys(config.frista_username, is_raw=True)
             time.sleep(0.3)
@@ -189,12 +189,9 @@ def start_frista_task(no_peserta: str, config: Config) -> None:
             _send_keys(config.frista_password, is_raw=True)
             time.sleep(0.3)
 
-            # 4. Pindah ke tombol Login & Submit (TAB -> ENTER + SPACE)
-            _send_keys("{TAB}", is_raw=False)
-            time.sleep(0.3)
+            # 4. Submit Form Login dengan ENTER bersih
             _send_keys("{ENTER}", is_raw=False)
-            _send_keys("{SPACE}", is_raw=False)
-            print("[INFO] Form & Tombol Login FRISTA disubmit (Username -> Password -> Login Button)")
+            print("[INFO] Form login FRISTA disubmit dengan {ENTER}")
 
             time.sleep(4.0)  # Tunggu otentikasi login selesai
         except Exception as err:
@@ -209,7 +206,6 @@ def start_frista_task(no_peserta: str, config: Config) -> None:
     if main_win:
         try:
             autoit.win_activate(main_win)
-            autoit.win_wait_active(main_win, timeout=5)
             time.sleep(0.5)
 
             _send_keys("^a{DEL}", is_raw=False)
@@ -257,7 +253,7 @@ def start_finger_task(no_peserta: str, config: Config) -> None:
             autoit.win_wait_active(login_win, timeout=5)
             time.sleep(0.6)
 
-            # 1. Langsung isi Username (kursor otomatis fokus di Username saat jendela aktif)
+            # 1. Langsung isi Username
             _send_keys("^a{DEL}", is_raw=False)
             _send_keys(config.finger_username, is_raw=True)
             time.sleep(0.3)
@@ -271,12 +267,9 @@ def start_finger_task(no_peserta: str, config: Config) -> None:
             _send_keys(config.finger_password, is_raw=True)
             time.sleep(0.3)
 
-            # 4. Pindah ke tombol Login ungu & Submit (TAB -> ENTER + SPACE)
-            _send_keys("{TAB}", is_raw=False)
-            time.sleep(0.3)
+            # 4. Submit Form Login dengan ENTER bersih (tanpa tombol ekstra)
             _send_keys("{ENTER}", is_raw=False)
-            _send_keys("{SPACE}", is_raw=False)
-            print("[INFO] Tombol Login Sidik Jari disubmit (Username -> Password -> Login Button)")
+            print("[INFO] Form login Sidik Jari disubmit dengan {ENTER}")
 
             time.sleep(4.0)  # Tunggu otentikasi login selesai
         except Exception as err:
